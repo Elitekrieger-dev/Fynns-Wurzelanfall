@@ -17,6 +17,7 @@ pygame.init()
 pygame.font.init()
 
 bg_image = pygame.image.load(r"assets\main_menu_background.png")
+score_image = pygame.image.load(r"assets\Score.png")
 
 power_up_1_image = pygame.image.load(r"assets\game_power_up_1.png")
 despawn_image = pygame.image.load(r"assets\game_despawn.png")
@@ -247,8 +248,10 @@ def endscreen(_):
     score_font = pygame.font.SysFont("Arial", 72, True, False)
     button_font = pygame.font.SysFont("Arial", 32, False, False)
 
+    display.blit(score_image, (0, 0))
+
     text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED)
-    text("Your Score: " + str(game.last_score), display_size[0]/2-display_size[0]/4, display_size[1]/2, score_font, BLACK)
+    text(str(game.last_score), display_size[0]/2-display_size[0]/2.8, display_size[1]/2-display_size[1]/2.15, score_font, BLACK)
 
     button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_)
     button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button)
