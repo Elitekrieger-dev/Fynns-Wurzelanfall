@@ -19,6 +19,7 @@ pygame.font.init()
 bg_image = pygame.image.load(r"assets\main_menu_background.png")
 
 power_up_1_image = pygame.image.load(r"assets\game_power_up_1.png")
+despawn_image = pygame.image.load(r"assets\game_despawn.png")
 
 display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption("Fynns Wurzelanfall")
@@ -144,6 +145,8 @@ class FynnsWurzelanfall:
 
         self.powerups: dict[tuple[int, int], list[Union[PowerUp, int]]] = {}
 
+        self.despawn_coordinates = []
+
         self.powerup_1_spawn = 10
 
         self.last_score = 0
@@ -208,6 +211,10 @@ def main_game(_events):
             if (i, j) in game.powerups.keys():
                 scaled_image = pygame.transform.scale(game.powerups[(i, j)][0].image, (size_of_one, size_of_one))
                 display.blit(scaled_image, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20))
+            if (i, j) in game.despawn_coordinates:
+                scaled_image = pygame.transform.scale(despawn_image, (size_of_one, size_of_one))
+                display.blit(scaled_image, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20))
+                game.despawn_coordinates.remove((i, j))
 
     button_font = pygame.font.SysFont("Arial", 32, False, False)
     button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button)
@@ -229,6 +236,8 @@ def main_game(_events):
             if game.powerups[i][1] <= 0:
                 to_remove.append(i)
         for i in to_remove:
+            for _ in range(60):
+                game.despawn_coordinates.append(i)
             game.powerups.pop(i)
 
 
