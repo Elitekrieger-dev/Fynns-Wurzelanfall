@@ -1,3 +1,7 @@
+import random
+from dataclasses import dataclass
+from typing import Callable
+
 import pygame
 import sys
 from enum import Enum
@@ -14,8 +18,19 @@ pygame.font.init()
 
 bg_image = pygame.image.load(r"assets\main_menu_background.png")
 
+power_up_1_image = pygame.image.load(r"assets\game_power_up_1.png")
+
 display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption("Fynns Wurzelanfall")
+
+
+@dataclass
+class PowerUp:
+    on_collect: Callable[[], None]
+    image: pygame.Surface
+
+    def new(self):
+        return PowerUp(self.on_collect, self.image)
 
 
 class ScreenType(Enum):
@@ -36,28 +51,43 @@ class Snake:
     direction: Direction
     increase_length: int
 
-    def __init__(self, _init_coordinates, _init_direction):
+    def __init__(self, _init_coordinates, _init_direction, _init_increase_length):
+        self.init_coordinates = _init_coordinates
+        self.init_direction = _init_direction
+        self.init_increase_length = _init_increase_length
         self.fields = [_init_coordinates]
         self.direction = _init_direction
-        self.increase_length = 3
+        self.increase_length = _init_increase_length
+        self.decrease_length = 0
 
     def move(self):
+        global current_screen
+        if len(self.fields) == 0:
+            self.reset()
+            current_screen = ScreenType.HOMESCREEN
         if len(self.fields) > 1:
             if self.increase_length == 0:
                 self.fields.pop(0)
             else:
                 self.increase_length -= 1
-            new_coordinates = list(self.fields[-1])
-            if self.direction == Direction.UP:
-                new_coordinates[1] -= 1
-            elif self.direction == Direction.DOWN:
-                new_coordinates[1] += 1
-            elif self.direction == Direction.LEFT:
-                new_coordinates[0] -= 1
-            elif self.direction == Direction.RIGHT:
-                new_coordinates[0] += 1
-            self.fields.append(tuple(new_coordinates))
-        elif self.increase_length > 0:
+            if self.decrease_length == 0:
+                new_coordinates = list(self.fields[-1])
+                if self.direction == Direction.UP:
+                    new_coordinates[1] -= 1
+                    new_coordinates[1] %= game.height
+                elif self.direction == Direction.DOWN:
+                    new_coordinates[1] += 1
+                    new_coordinates[1] %= game.height
+                elif self.direction == Direction.LEFT:
+                    new_coordinates[0] -= 1
+                    new_coordinates[0] %= game.width
+                elif self.direction == Direction.RIGHT:
+                    new_coordinates[0] += 1
+                    new_coordinates[0] %= game.width
+                self.fields.append(tuple(new_coordinates))
+            else:
+                self.decrease_length -= 1
+        elif self.increase_length > 0 and self.decrease_length == 0:
             self.increase_length -= 1
             new_coordinates = list(self.fields[-1])
             if self.direction == Direction.UP:
@@ -69,6 +99,12 @@ class Snake:
             elif self.direction == Direction.RIGHT:
                 new_coordinates[0] += 1
             self.fields.append(tuple(new_coordinates))
+        elif self.increase_length > 0 and self.decrease_length > 0:
+            self.increase_length -= 1
+            self.decrease_length -= 1
+        elif self.decrease_length > 0:
+            self.decrease_length -= 1
+            self.fields.pop(0)
         else:
             new_coordinates = list(self.fields[-1])
             if self.direction == Direction.UP:
@@ -78,18 +114,41 @@ class Snake:
             elif self.direction == Direction.LEFT:
                 new_coordinates[0] -= 1
             elif self.direction == Direction.RIGHT:
-                new_coordinates[0] += 1#
+                new_coordinates[0] += 1
             self.fields[0] = tuple(new_coordinates)
+        if len(set(self.fields)) != len(self.fields):
+            self.reset()
+            current_screen = ScreenType.HOMESCREEN
+        if self.fields[-1] in game.powerups.keys():
+            game.powerups[self.fields[-1]].on_collect()
+            game.powerups.pop(self.fields[-1])
+
+    def reset(self):
+        self.fields = [self.init_coordinates]
+        self.direction = self.init_direction
+        self.increase_length = self.init_increase_length
+        self.decrease_length = 0
 
     def is_on_field(self, field):
         return field in self.fields
 
 
 class FynnsWurzelanfall:
-    def __init__(self, _height, _width):
+    def __init__(self, _height, _width, _init_x, _init_y, _start_length):
         self.height = _height
         self.width = _width
-        self.snake = Snake((15, 15), Direction.RIGHT)
+        self.snake = Snake((_init_x, _init_y), Direction.RIGHT, _start_length-1)
+
+        self.powerups: dict[tuple[int, int], PowerUp] = {}
+
+        self.powerup_1_spawn = 10
+
+    def spawn_power_up(self, powerup):
+        pos = random.randint(0, self.width), random.randint(0, self.height)
+        while pos in self.powerups.keys() or pos in self.snake.fields:
+            pos = random.randint(0, self.width), random.randint(0, self.height)
+
+        self.powerups |= {pos: powerup.new()}
 
 
 clock = pygame.time.Clock()
@@ -98,7 +157,11 @@ gameloop = True
 current_screen: ScreenType = ScreenType.HOMESCREEN
 
 
-def homescreen(_):
+def homescreen(_events):
+    for event in _events:
+        if event.type == pygame.QUIT:
+            global gameloop
+            gameloop = False
     display.blit(bg_image, (0, 0))
     size = display.get_size()
     title_font = pygame.font.SysFont("Arial", 130, False, False)
@@ -113,6 +176,16 @@ def homescreen(_):
 
 
 def main_game(_events):
+    for event in _events:
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DOWN:
+                game.snake.direction = Direction.DOWN
+            elif event.key == pygame.K_UP:
+                game.snake.direction = Direction.UP
+            elif event.key == pygame.K_LEFT:
+                game.snake.direction = Direction.LEFT
+            elif event.key == pygame.K_RIGHT:
+                game.snake.direction = Direction.RIGHT
     display_size = display.get_size()
     size_of_one = int((display_size[1]-display_size[1]/10)/game.height)
     for i in range(game.height):
@@ -121,14 +194,21 @@ def main_game(_events):
                 pygame.draw.rect(display, BLACK, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20, size_of_one, size_of_one), 1)
             else:
                 pygame.draw.rect(display, BLACK, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20, size_of_one, size_of_one))
+            if (i, j) in game.powerups.keys():
+                scaled_image = pygame.transform.scale(game.powerups[(i, j)].image, (size_of_one, size_of_one))
+                display.blit(scaled_image, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20))
 
     button_font = pygame.font.SysFont("Arial", 32, False, False)
 
     button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button)
     global frame
-    if frame >= 60:
+    if frame >= 30:
         frame = 0
         game.snake.move()
+        if game.powerup_1_spawn <= 0:
+            game.powerup_1_spawn = 10
+            game.spawn_power_up(power_up_1)
+        game.powerup_1_spawn -= 1
 
 
 
@@ -163,24 +243,19 @@ def main_menu_button():
     current_screen = ScreenType.HOMESCREEN
 
 
-game = FynnsWurzelanfall(30, 30)
+def on_power_up_1_collect():
+    game.snake.increase_length += 1
+
+
+power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image)
+
+
+game = FynnsWurzelanfall(30, 30, 15, 15, 3)
 
 frame = 0
 
 while gameloop:
     events = pygame.event.get()
-    for event in events:
-        if event.type == pygame.QUIT:
-            gameloop = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DOWN:
-                game.snake.direction = Direction.DOWN
-            elif event.key == pygame.K_UP:
-                game.snake.direction = Direction.UP
-            elif event.key == pygame.K_LEFT:
-                game.snake.direction = Direction.LEFT
-            elif event.key == pygame.K_RIGHT:
-                game.snake.direction = Direction.RIGHT
 
     display.fill(color=BACKGROUND)
 
