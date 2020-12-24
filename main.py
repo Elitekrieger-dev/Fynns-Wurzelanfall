@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Union
 
 import pygame
 import sys
@@ -28,9 +28,10 @@ pygame.display.set_caption("Fynns Wurzelanfall")
 class PowerUp:
     on_collect: Callable[[], None]
     image: pygame.Surface
+    despawn_time: int
 
     def new(self):
-        return PowerUp(self.on_collect, self.image)
+        return PowerUp(self.on_collect, self.image, self.despawn_time)
 
 
 class ScreenType(Enum):
@@ -117,10 +118,10 @@ class Snake:
                 new_coordinates[0] += 1
             self.fields[0] = tuple(new_coordinates)
         if len(set(self.fields)) != len(self.fields):
-            self.reset()
-            current_screen = ScreenType.HOMESCREEN
+            game.reset()
+            current_screen = ScreenType.END_SCREEN
         if self.fields[-1] in game.powerups.keys():
-            game.powerups[self.fields[-1]].on_collect()
+            game.powerups[self.fields[-1]][0].on_collect()
             game.powerups.pop(self.fields[-1])
 
     def reset(self):
@@ -139,16 +140,28 @@ class FynnsWurzelanfall:
         self.width = _width
         self.snake = Snake((_init_x, _init_y), Direction.RIGHT, _start_length-1)
 
-        self.powerups: dict[tuple[int, int], PowerUp] = {}
+        self.score = 0
+
+        self.powerups: dict[tuple[int, int], list[Union[PowerUp, int]]] = {}
 
         self.powerup_1_spawn = 10
+
+        self.last_score = 0
 
     def spawn_power_up(self, powerup):
         pos = random.randint(0, self.width), random.randint(0, self.height)
         while pos in self.powerups.keys() or pos in self.snake.fields:
             pos = random.randint(0, self.width), random.randint(0, self.height)
 
-        self.powerups |= {pos: powerup.new()}
+        powerup = powerup.new()
+        self.powerups |= {pos: [powerup, powerup.despawn_time]}
+
+    def reset(self):
+        self.last_score = self.score
+        self.score = 0
+        self.powerups = {}
+        self.powerup_1_spawn = 10
+        self.snake.reset()
 
 
 clock = pygame.time.Clock()
@@ -170,9 +183,7 @@ def homescreen(_events):
     button("Start", size[0]/2+size[0]/9, size[1]/2-size[1]/10, size[0]/8, size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, start_button)
     button("Quit", size[0]/2+size[0]/9, size[1]/2+size[1]/32, size[0]/8, size[1]/8, RED, RED_2, button_font, BLACK, 1, quit_button)
 
-    title = title_font.render("Fynns Wurzelanfall", False, BLACK)
-
-    display.blit(title, (size[0]/3-size[0]/8, size[1]/4.7))
+    text("Fynns Wurzelanfall", size[0]/3-size[0]/8, size[1]/4.7, title_font, BLACK)
 
 
 def main_game(_events):
@@ -195,12 +206,15 @@ def main_game(_events):
             else:
                 pygame.draw.rect(display, BLACK, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20, size_of_one, size_of_one))
             if (i, j) in game.powerups.keys():
-                scaled_image = pygame.transform.scale(game.powerups[(i, j)].image, (size_of_one, size_of_one))
+                scaled_image = pygame.transform.scale(game.powerups[(i, j)][0].image, (size_of_one, size_of_one))
                 display.blit(scaled_image, (i*size_of_one+display_size[1]/20, j*size_of_one+display_size[1]/20))
 
     button_font = pygame.font.SysFont("Arial", 32, False, False)
-
     button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button)
+
+    score_font = pygame.font.SysFont("Arial", 32, True, False)
+    text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK)
+
     global frame
     if frame >= 30:
         frame = 0
@@ -209,6 +223,26 @@ def main_game(_events):
             game.powerup_1_spawn = 10
             game.spawn_power_up(power_up_1)
         game.powerup_1_spawn -= 1
+        to_remove = []
+        for i in game.powerups.keys():
+            game.powerups[i][1] -= 1
+            if game.powerups[i][1] <= 0:
+                to_remove.append(i)
+        for i in to_remove:
+            game.powerups.pop(i)
+
+
+def endscreen(_):
+    display_size = display.get_size()
+    gameover_font = pygame.font.SysFont("Arial", 172, True, False)
+    score_font = pygame.font.SysFont("Arial", 72, True, False)
+    button_font = pygame.font.SysFont("Arial", 32, False, False)
+
+    text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED)
+    text("Your Score: " + str(game.last_score), display_size[0]/2-display_size[0]/4, display_size[1]/2, score_font, BLACK)
+
+    button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_)
+    button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button)
 
 
 
@@ -223,9 +257,14 @@ def button(msg, x, y, w, h, ic, ac, font, color, button_id, action=None, x_offse
     else:
         pygame.draw.rect(display, ic, (x, y, w, h))
 
-    text = font.render(msg, False, color)
+    text_ = font.render(msg, False, color)
 
-    display.blit(text, (x + w/4 + x_offset, y + h/3 + y_offset))
+    display.blit(text_, (x + w/4 + x_offset, y + h/3 + y_offset))
+
+
+def text(msg, x, y, font, color):
+    text_ = font.render(msg, False, color)
+    display.blit(text_, (x, y))
 
 
 def quit_button():
@@ -240,14 +279,26 @@ def start_button():
 
 def main_menu_button():
     global current_screen
+    game.reset()
     current_screen = ScreenType.HOMESCREEN
+
+
+def main_menu_button_():
+    global current_screen
+    current_screen = ScreenType.HOMESCREEN
+
+
+def play_again_button():
+    global  current_screen
+    current_screen = ScreenType.MAIN_GAME
 
 
 def on_power_up_1_collect():
     game.snake.increase_length += 1
+    game.score += 1
 
 
-power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image)
+power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image, 15*2)
 
 
 game = FynnsWurzelanfall(30, 30, 15, 15, 3)
@@ -263,6 +314,8 @@ while gameloop:
         homescreen(events)
     elif current_screen == ScreenType.MAIN_GAME:
         main_game(events)
+    elif current_screen == ScreenType.END_SCREEN:
+        endscreen(events)
 
     pygame.display.update()
     frame += 1
