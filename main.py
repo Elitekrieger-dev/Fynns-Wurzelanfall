@@ -184,10 +184,10 @@ def homescreen(_events):
     title_font = pygame.font.SysFont("Arial", 130, False, False)
     button_font = pygame.font.SysFont("Arial", 64, False, False)
 
-    button("Start", size[0]/2+size[0]/9, size[1]/2-size[1]/10, size[0]/8, size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, start_button)
-    button("Quit", size[0]/2+size[0]/9, size[1]/2+size[1]/32, size[0]/8, size[1]/8, RED, RED_2, button_font, BLACK, 1, quit_button)
+    button("Start", size[0]/2+size[0]/9, size[1]/2-size[1]/10, size[0]/8, size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, start_button, antialias=True)
+    button("Quit", size[0]/2+size[0]/9, size[1]/2+size[1]/32, size[0]/8, size[1]/8, RED, RED_2, button_font, BLACK, 1, quit_button, antialias=True)
 
-    text("Fynns Wurzelanfall", size[0]/3-size[0]/8, size[1]/4.7, title_font, BLACK)
+    text("Fynns Wurzelanfall", size[0]/3-size[0]/8, size[1]/4.7, title_font, BLACK, antialias=True)
 
 
 def main_game(_events):
@@ -218,10 +218,10 @@ def main_game(_events):
                 game.despawn_coordinates.remove((i, j))
 
     button_font = pygame.font.SysFont("Arial", 32, False, False)
-    button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button)
+    button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button, antialias=True)
 
     score_font = pygame.font.SysFont("Arial", 32, True, False)
-    text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK)
+    text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK, antialias=True)
 
     global frame
     if frame >= 30:
@@ -250,15 +250,15 @@ def endscreen(_):
 
     display.blit(score_image, (0, 0))
 
-    text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED)
-    text(str(game.last_score), display_size[0]/2-display_size[0]/2.8, display_size[1]/2-display_size[1]/2.15, score_font, BLACK)
+    text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED, antialias=True)
+    text(str(game.last_score), display_size[0]/2-display_size[0]/2.8, display_size[1]/2-display_size[1]/2.15, score_font, BLACK, antialias=True)
 
-    button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_)
-    button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button)
+    button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_, antialias=True)
+    button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button, antialias=True)
 
 
 
-def button(msg, x, y, w, h, ic, ac, font, color, button_id, action=None, x_offset=0, y_offset=0,  *args):
+def button(msg, x, y, w, h, ic, ac, font, color, button_id, action=None, x_offset=0, y_offset=0, antialias=False, *args):
     mouse = pygame.mouse.get_pos()
     click = pygame.mouse.get_pressed(5)
     if x+w > mouse[0] > x and y+h > mouse[1] > y:
@@ -269,13 +269,13 @@ def button(msg, x, y, w, h, ic, ac, font, color, button_id, action=None, x_offse
     else:
         pygame.draw.rect(display, ic, (x, y, w, h))
 
-    text_ = font.render(msg, False, color)
+    text_ = font.render(msg, antialias, color)
 
     display.blit(text_, (x + w/4 + x_offset, y + h/3 + y_offset))
 
 
-def text(msg, x, y, font, color):
-    text_ = font.render(msg, False, color)
+def text(msg, x, y, font, color, antialias=False):
+    text_ = font.render(msg, antialias, color)
     display.blit(text_, (x, y))
 
 
