@@ -12,6 +12,23 @@ RED = (255, 0, 0)
 RED_2 = (200, 0, 0)
 GREEN = (0, 255, 0)
 GREEN_2 = (0, 200, 0)
+GRAY = (150, 150, 150)
+GRAY_2 = (100, 100, 100)
+GRAY_3 = (80, 80, 80)
+
+FPS = 60
+TICK_MULT = 2
+TICK_TIME = FPS / TICK_MULT
+
+HEIGHT = 30
+WIDTH = 30
+
+INIT_LENGTH = 3
+
+POWERUP_1_SPAWN = TICK_MULT * 5
+POWERUP_1_DESPAWN = TICK_MULT * 15
+
+POWERUP_DESPAWN = TICK_MULT * 2
 
 pygame.init()
 pygame.font.init()
@@ -24,6 +41,19 @@ despawn_image = pygame.image.load(r"assets\game_despawn.png")
 
 display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption("Fynns Wurzelanfall")
+
+
+class Setting(Enum):
+    TEXT_ANTIALIAS = 0
+    SIZE = 1
+
+
+settings: dict[Setting, Union[int, float, bool]] = {
+    Setting.TEXT_ANTIALIAS: True,
+    Setting.SIZE: 30
+}
+
+temp: dict = {}
 
 
 @dataclass
@@ -40,6 +70,7 @@ class ScreenType(Enum):
     HOMESCREEN = 0
     MAIN_GAME = 1
     END_SCREEN = 2
+    SETTINGS = 3
 
 
 class Direction(Enum):
@@ -120,7 +151,7 @@ class Snake:
                 new_coordinates[0] += 1
             self.fields[0] = tuple(new_coordinates)
         if len(set(self.fields)) != len(self.fields):
-            game.reset()
+            reset()
             current_screen = ScreenType.END_SCREEN
         if self.fields[-1] in game.powerups.keys():
             game.powerups[self.fields[-1]][0].on_collect()
@@ -137,7 +168,7 @@ class Snake:
 
 
 class FynnsWurzelanfall:
-    def __init__(self, _height, _width, _init_x, _init_y, _start_length):
+    def __init__(self, _height, _width, _init_x, _init_y, _start_length, _last_score=0):
         self.height = _height
         self.width = _width
         self.snake = Snake((_init_x, _init_y), Direction.RIGHT, _start_length-1)
@@ -148,9 +179,9 @@ class FynnsWurzelanfall:
 
         self.despawn_coordinates = []
 
-        self.powerup_1_spawn = 10
+        self.powerup_1_spawn = POWERUP_1_SPAWN
 
-        self.last_score = 0
+        self.last_score = _last_score
 
     def spawn_power_up(self, powerup):
         pos = random.randint(0, self.width), random.randint(0, self.height)
@@ -183,11 +214,13 @@ def homescreen(_events):
     size = display.get_size()
     title_font = pygame.font.SysFont("Arial", 130, False, False)
     button_font = pygame.font.SysFont("Arial", 64, False, False)
+    settings_font = pygame.font.SysFont("Arial", 48, False, False)
 
-    button("Start", size[0]/2+size[0]/9, size[1]/2-size[1]/10, size[0]/8, size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, start_button, antialias=True)
-    button("Quit", size[0]/2+size[0]/9, size[1]/2+size[1]/32, size[0]/8, size[1]/8, RED, RED_2, button_font, BLACK, 1, quit_button, antialias=True)
+    button("Start", size[0]/2+size[0]/9, size[1]/2-size[1]/10, size[0]/8, size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, action=start_button, antialias=settings[Setting.TEXT_ANTIALIAS])
+    button("Quit", size[0]/2+size[0]/9, size[1]/2+size[1]/32, size[0]/8, size[1]/8, RED, RED_2, button_font, BLACK, 1, action=quit_button, antialias=settings[Setting.TEXT_ANTIALIAS])
+    button("Settings", size[0]-size[0]/7, size[1]/32, size[0]/8, size[1]/8, GRAY, GRAY_2, settings_font, BLACK, 1, action=settings_button, antialias=settings[Setting.TEXT_ANTIALIAS], x_offset=size[0]/-64)
 
-    text("Fynns Wurzelanfall", size[0]/3-size[0]/8, size[1]/4.7, title_font, BLACK, antialias=True)
+    text("Fynns Wurzelanfall", size[0]/3-size[0]/8, size[1]/4.7, title_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
 
 
 def main_game(_events):
@@ -218,17 +251,17 @@ def main_game(_events):
                 game.despawn_coordinates.remove((i, j))
 
     button_font = pygame.font.SysFont("Arial", 32, False, False)
-    button("Home Screen", display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button, antialias=True)
+    button("Home Screen", display_size[0]-display_size[0]/3.7, display_size[1]-(display_size[1]/32)*31, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button, antialias=settings[Setting.TEXT_ANTIALIAS])
 
     score_font = pygame.font.SysFont("Arial", 32, True, False)
-    text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK, antialias=True)
+    text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
 
     global frame
-    if frame >= 30:
+    if frame >= TICK_TIME:
         frame = 0
         game.snake.move()
         if game.powerup_1_spawn <= 0:
-            game.powerup_1_spawn = 10
+            game.powerup_1_spawn = POWERUP_1_SPAWN
             game.spawn_power_up(power_up_1)
         game.powerup_1_spawn -= 1
         to_remove = []
@@ -237,8 +270,7 @@ def main_game(_events):
             if game.powerups[i][1] <= 0:
                 to_remove.append(i)
         for i in to_remove:
-            for _ in range(60):
-                game.despawn_coordinates.append(i)
+            game.despawn_coordinates.extend([i] * POWERUP_DESPAWN)
             game.powerups.pop(i)
 
 
@@ -250,12 +282,79 @@ def endscreen(_):
 
     display.blit(score_image, (0, 0))
 
-    text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED, antialias=True)
-    text(str(game.last_score), display_size[0]/2-display_size[0]/2.8, display_size[1]/2-display_size[1]/2.15, score_font, BLACK, antialias=True)
+    text("GAME OVER", display_size[0]/2-display_size[0]/4, display_size[1]/2-display_size[1]/4, gameover_font, RED, antialias=settings[Setting.TEXT_ANTIALIAS])
+    text(str(game.last_score), display_size[0]/2-display_size[0]/2.8, display_size[1]/2-display_size[1]/2.15, score_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
 
-    button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_, antialias=True)
-    button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button, antialias=True)
+    button("Home Screen", display_size[0]/2-display_size[0]/4, display_size[1]/1.2, display_size[0]/2, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=main_menu_button_, antialias=settings[Setting.TEXT_ANTIALIAS])
+    button("Play Again", display_size[0]/2-display_size[0]/4, display_size[1]/1.5, display_size[0]/2, display_size[1]/8, GREEN, GREEN_2, button_font, BLACK, 1, x_offset=display_size[0]/15, action=play_again_button, antialias=settings[Setting.TEXT_ANTIALIAS])
 
+class SettingsTab(Enum):
+    VIDEO = 0
+    GAME = 1
+
+def settings_screen(_):
+    global temp
+    if temp.get("antialias_timeout"):
+        temp["antialias_timeout"] -= 1
+    if temp.get("size_timeout"):
+        temp["size_timeout"] -= 1
+
+    def video():
+        def antialias():
+            def false():
+                if temp.get("antialias_timeout") == 0 or temp.get("antialias_timeout") is None:
+                    settings[Setting.TEXT_ANTIALIAS] = False
+                temp["antialias_timeout"] = 2
+            def true():
+                if temp.get("antialias_timeout") == 0 or temp.get("antialias_timeout") is None:
+                    settings[Setting.TEXT_ANTIALIAS] = True
+                temp["antialias_timeout"] = 2
+            value = settings[Setting.TEXT_ANTIALIAS]
+            if value is False:
+                button("Text Antialiasing", display_size[0]/32, display_size[1]/8, display_size[0]/4, display_size[1]/12, RED, RED_2, button_font, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=true)
+            elif value is True:
+                button("Text Antialiasing", display_size[0]/32, display_size[1]/8, display_size[0]/4, display_size[1]/12, GREEN, GREEN_2, button_font, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=false)
+        antialias()
+
+    def game_tab():
+        def size():
+            def inc():
+                if temp.get("size_timeout") == 0 or temp.get("size_timeout") is None:
+                    if settings[Setting.SIZE] < 100:
+                        settings[Setting.SIZE] += 1
+                temp["size_timeout"] = 2
+            def dec():
+                if temp.get("size_timeout") == 0 or temp.get("size_timeout") is None:
+                    if settings[Setting.SIZE] > 5:
+                        settings[Setting.SIZE] -= 1
+                temp["size_timeout"] = 2
+            button_font_ = pygame.font.SysFont("Arial", 144, False, False)
+            text_font = pygame.font.SysFont("Arial", 60, False, False)
+            button("-", display_size[0] / 32, display_size[1] / 8, display_size[0] / 20, display_size[1] / 12, RED, RED_2, button_font_, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=dec, y_offset=-display_size[1]/14)
+            text(f"Grid Size: {settings[Setting.SIZE]}", display_size[0] / 12, display_size[1] / 7.5, text_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
+            button("+", display_size[0] / 3.5, display_size[1] / 8, display_size[0] / 20, display_size[1] / 12, GREEN, GREEN_2, button_font_, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=inc, y_offset=-display_size[1]/17, x_offset=-display_size[0]/100)
+
+        size()
+
+    def set_tab_video():
+        temp["settings_current_tab"] = SettingsTab.VIDEO
+    def set_tab_game():
+        temp["settings_current_tab"] = SettingsTab.GAME
+
+    button_font = pygame.font.SysFont("Arial", 32, False, False)
+
+    display_size = display.get_size()
+
+    current_tab = temp.get("settings_current_tab") or SettingsTab.VIDEO
+
+    button("Home Screen", display_size[0]/1.2, display_size[1]/1.2, display_size[0]/8, display_size[1]/8, RED, RED_2, button_font, BLACK, 1, x_offset=-(display_size[0]/48), action=main_menu_button, antialias=settings[Setting.TEXT_ANTIALIAS])
+    button("Video", display_size[0]/32, display_size[1]/32, display_size[0]/12, display_size[1]/12, *(GRAY, GRAY_2) if not current_tab == SettingsTab.VIDEO else (GRAY_2, GRAY_3), button_font, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=set_tab_video)
+    button("Game", display_size[0]/8.74, display_size[1]/32, display_size[0]/12, display_size[1]/12, *(GRAY, GRAY_2) if not current_tab == SettingsTab.GAME else (GRAY_2, GRAY_3), button_font, BLACK, 1, antialias=settings[Setting.TEXT_ANTIALIAS], action=set_tab_game)
+
+    if current_tab == SettingsTab.VIDEO:
+        video()
+    if current_tab == SettingsTab.GAME:
+        game_tab()
 
 
 def button(msg, x, y, w, h, ic, ac, font, color, button_id, action=None, x_offset=0, y_offset=0, antialias=False, *args):
@@ -291,7 +390,7 @@ def start_button():
 
 def main_menu_button():
     global current_screen
-    game.reset()
+    reset()
     current_screen = ScreenType.HOMESCREEN
 
 
@@ -301,8 +400,12 @@ def main_menu_button_():
 
 
 def play_again_button():
-    global  current_screen
+    global current_screen
     current_screen = ScreenType.MAIN_GAME
+
+def settings_button():
+    global current_screen
+    current_screen = ScreenType.SETTINGS
 
 
 def on_power_up_1_collect():
@@ -310,10 +413,14 @@ def on_power_up_1_collect():
     game.score += 1
 
 
-power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image, 15*2)
+def reset():
+    global game
+    game = FynnsWurzelanfall(settings[Setting.SIZE], settings[Setting.SIZE], settings[Setting.SIZE]//2, settings[Setting.SIZE]//2, INIT_LENGTH, _last_score=game.last_score)
 
 
-game = FynnsWurzelanfall(30, 30, 15, 15, 3)
+power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image, POWERUP_1_DESPAWN)
+
+game = FynnsWurzelanfall(settings[Setting.SIZE], settings[Setting.SIZE], settings[Setting.SIZE]//2, settings[Setting.SIZE]//2, INIT_LENGTH)
 
 frame = 0
 
@@ -322,16 +429,22 @@ while gameloop:
 
     display.fill(color=BACKGROUND)
 
+    for e in events:
+        if e.type == pygame.QUIT:
+            gameloop = False
+
     if current_screen == ScreenType.HOMESCREEN:
         homescreen(events)
     elif current_screen == ScreenType.MAIN_GAME:
         main_game(events)
     elif current_screen == ScreenType.END_SCREEN:
         endscreen(events)
+    elif current_screen == ScreenType.SETTINGS:
+        settings_screen(events)
 
     pygame.display.update()
     frame += 1
-    clock.tick(60)
+    clock.tick(FPS)
 
 pygame.quit()
 sys.exit(0)
