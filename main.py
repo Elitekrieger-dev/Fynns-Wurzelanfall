@@ -2,8 +2,11 @@ import random
 from dataclasses import dataclass
 from typing import Callable, Union
 
+import errno
+import json
 import pygame
 import sys
+import os
 from enum import Enum
 
 BACKGROUND = (255, 255, 255)
@@ -18,7 +21,7 @@ GRAY_3 = (80, 80, 80)
 
 FPS = 60
 TICK_MULT = 2
-TICK_TIME = FPS / TICK_MULT
+TICK_TIME = FPS // TICK_MULT
 
 HEIGHT = 30
 WIDTH = 30
@@ -28,7 +31,7 @@ INIT_LENGTH = 3
 POWERUP_1_SPAWN = TICK_MULT * 5
 POWERUP_1_DESPAWN = TICK_MULT * 15
 
-POWERUP_DESPAWN = TICK_MULT * 2
+POWERUP_DESPAWN = TICK_TIME * 2
 
 pygame.init()
 pygame.font.init()
@@ -41,6 +44,8 @@ despawn_image = pygame.image.load(r"assets\game_despawn.png")
 
 display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption("Fynns Wurzelanfall")
+
+SAVEGAME_PATH = "data/savegame.json"
 
 
 class Setting(Enum):
@@ -185,19 +190,15 @@ class FynnsWurzelanfall:
 
     def spawn_power_up(self, powerup):
         pos = random.randint(0, self.width), random.randint(0, self.height)
+        counter = 0
         while pos in self.powerups.keys() or pos in self.snake.fields:
             pos = random.randint(0, self.width), random.randint(0, self.height)
+            counter += 1
+            if counter > self.width * self.height * 4:
+                reset()
 
         powerup = powerup.new()
         self.powerups |= {pos: [powerup, powerup.despawn_time]}
-
-    def reset(self):
-        self.last_score = self.score
-        self.score = 0
-        self.powerups = {}
-        self.powerup_1_spawn = 10
-        self.snake.reset()
-
 
 clock = pygame.time.Clock()
 
@@ -255,6 +256,7 @@ def main_game(_events):
 
     score_font = pygame.font.SysFont("Arial", 32, True, False)
     text("Score: " + str(game.score), display_size[0]-display_size[0]/4, display_size[1]-(display_size[1]/32)*16, score_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
+    text("High Score: " + str(save["highscore"]), display_size[0] - display_size[0] / 4,display_size[1] - (display_size[1] / 30) * 16, score_font, BLACK, antialias=settings[Setting.TEXT_ANTIALIAS])
 
     global frame
     if frame >= TICK_TIME:
@@ -391,6 +393,8 @@ def start_button():
 def main_menu_button():
     global current_screen
     reset()
+    save_settings()
+    save_savegame()
     current_screen = ScreenType.HOMESCREEN
 
 
@@ -415,12 +419,67 @@ def on_power_up_1_collect():
 
 def reset():
     global game
-    game = FynnsWurzelanfall(settings[Setting.SIZE], settings[Setting.SIZE], settings[Setting.SIZE]//2, settings[Setting.SIZE]//2, INIT_LENGTH, _last_score=game.last_score)
+    game = FynnsWurzelanfall(settings[Setting.SIZE], settings[Setting.SIZE], settings[Setting.SIZE]//2, settings[Setting.SIZE]//2, INIT_LENGTH, _last_score=game.score)
+    if game.last_score > save["highscore"]:
+        save["highscore"] = game.last_score
+        save_savegame()
+
+
+def load_savegame():
+    global save
+    if os.path.exists(SAVEGAME_PATH):
+        with open(SAVEGAME_PATH, "rb") as f:
+            ssave = f.read().decode("utf-8")
+            jsonsave = json.loads(ssave)
+            for line in jsonsave.items():
+                if not line[0] == "settings":
+                    save |= {line[0]: line[1]}
+        load_settings(jsonsave["settings"])
+    else:
+        try:
+            os.makedirs(os.path.dirname(SAVEGAME_PATH))
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
+        with open(SAVEGAME_PATH, "wb") as f:
+            f.write(json.dumps(save).encode("utf-8"))
+
+
+def save_savegame():
+    global save
+    with open(SAVEGAME_PATH, "wb") as f:
+        f.write(json.dumps(save).encode("utf-8"))
+
+
+def parse_settings_to_json(_settings):
+    ret = {}
+    for i in _settings.items():
+        ret |= {i[0].name: i[1]}
+    return ret
+
+
+def load_settings(_save):
+    global settings
+    for i in _save.copy().items():
+        settings |= {Setting[i[0]]: i[1]}
+
+
+def save_settings():
+    save["settings"] = parse_settings_to_json(settings)
 
 
 power_up_1 = PowerUp(on_power_up_1_collect, power_up_1_image, POWERUP_1_DESPAWN)
 
+save = {
+    "highscore": 0,
+    "settings": parse_settings_to_json(settings)
+}
+
+load_savegame()
+save_savegame()
+
 game = FynnsWurzelanfall(settings[Setting.SIZE], settings[Setting.SIZE], settings[Setting.SIZE]//2, settings[Setting.SIZE]//2, INIT_LENGTH)
+
 
 frame = 0
 
