@@ -45,7 +45,7 @@ despawn_image = pygame.image.load(r"assets\game_despawn.png")
 display = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 pygame.display.set_caption("Fynns Wurzelanfall")
 
-SAVEGAME_PATH = "data/savegame.json"
+SAVEGAME_PATH = os.path.join(os.getenv("appdata"), "Fynns Wurzelanfall/data/savegame.json")
 
 
 class Setting(Enum):
